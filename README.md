@@ -1,12 +1,12 @@
 # cf31-touchscreen-calibrate
 
-Touchscreen calibration for the Panasonic Toughbook CF-31/CF-19 Fujitsu touch panel
+Touchscreen calibration primarily for the Panasonic Toughbook CF-31/CF-19 Fujitsu touch panel
 on Wayland, where `xinput_calibrator` and GNOME's touchscreen settings cannot see the
 device at all.
 
-Tested working on a CF-31 Mk5, Ubuntu 24.04, GNOME/Wayland.
+Tested working on a CF-31 Mk5/CF-19 Mk4/CF-19 Mk5/CF-19 Mk7, Ubuntu 24.04, GNOME/Wayland.
 
-> **LLM-generated.** Written by Claude (Anthropic), from live diagnosis of a real CF-31,
+> **LLM-generated.** Written by Claude (Anthropic), from live diagnosis of a real PC,
 > and confirmed working on that hardware. It runs as root and writes a udev rule — read
 > it before you run it.
 
@@ -14,7 +14,7 @@ Tested working on a CF-31 Mk5, Ubuntu 24.04, GNOME/Wayland.
 
 Two independent reasons.
 
-**1. udev classifies it as a mouse.** The panel reports `ABS_X`/`ABS_Y`, but signals
+**1. for some devices udev classifies it as a mouse.** The panel reports `ABS_X`/`ABS_Y`, but signals
 contact with `BTN_LEFT` instead of `BTN_TOUCH` and never sets `INPUT_PROP_DIRECT`:
 
 ```
@@ -47,10 +47,12 @@ Calibration:      identity matrix     # not "n/a", so a matrix will be applied
 sudo python3 calibrate-touchscreen.py
 ```
 
-It grabs the device (so calibration touches don't click things underneath), asks you to
+The script first asks for the Toughbook model. For another device, select Unknown and enter its input device name, USB vendor/product ID and whether contact is reported using BTN_TOUCH or BTN_LEFT.
+
+Then it grabs the device (so calibration touches don't click things underneath), asks you to
 touch **top-left, top-right and bottom-left**, and solves the affine transform — handling
 offset, scale, inversion, axis swap and mild rotation. It then writes
-`/etc/udev/rules.d/99-cf31-touchscreen-calibration.rules` and re-binds the panel's USB
+`/etc/udev/rules.d/99-touchscreen-calibration.rules` and re-binds the panel's USB
 port so the matrix applies without a reboot.
 
 Touch as close to the edge of the glass as you can; those three points set the accuracy
@@ -65,19 +67,19 @@ grep -c Fujitsu /proc/bus/input/devices    # 1 = present, 0 = see below
 To revert:
 
 ```
-sudo rm /etc/udev/rules.d/99-cf31-touchscreen-calibration.rules && sudo reboot
+sudo rm /etc/udev/rules.d/99-touchscreen-calibration.rules && sudo reboot
 ```
 
-## Don't force `ID_INPUT_TOUCHSCREEN=1`
+## Don't force `ID_INPUT_TOUCHSCREEN=1` on non-`BTN_TOUCH` devices
 
 The tempting fix is a udev rule re-tagging the panel as a touchscreen so the normal tools
 can see it. Don't. libinput's touch path expects `BTN_TOUCH` or multitouch (`ABS_MT_*`)
-slots, and this panel has neither — re-tagging tends to kill touch input rather than fix
+slots, and the panel may have neither — re-tagging tends to kill touch input rather than fix
 it. Calibrating it as the absolute pointer it already is avoids that risk.
 
 ## If the panel never enumerates
 
-On the development unit it appeared on only one of five consecutive boots. On the failing
+On the CF-31 Mk5 development unit it appeared on only one of five consecutive boots. On the failing
 boots its USB port logged nothing at all — a clean absence, not a marginal connection,
 which would instead show `error -71` and enumeration retries. It was not USB power
 management (autosuspend was already off), and `panasonic_laptop` exposes no toggle. That
